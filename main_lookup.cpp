@@ -25,10 +25,10 @@ int main(int argc, char *argv[]) {
   }
 
   std::string dir_path;
-  size_t record_size;
-  long long max_time;
-  bool buffered;
-  int num_threads;
+  size_t record_size = 0;
+  long long max_time = 0;
+  bool buffered = true;
+  int num_threads = 1;
 
   for (int i = 1; i < argc; i++) {
     std::pair<std::string, std::string> arg = tps::parse_arg(argv[i]);
@@ -67,12 +67,15 @@ int main(int argc, char *argv[]) {
 
   tps::FileLookup fl(dir_path, record_size, max_time, buffered, num_threads);
   fl.start_read();
-  std::cout.imbue(std::locale(""));
+  std::cout.imbue(std::locale("en_US.UTF-8"));
   std::cout << "operations: " << fl.total_ops() << std::endl;
   std::cout << "total time: " << fl.total_time() << " ns" << std::endl;
   std::cout << "total size: " << fl.total_bytes() << " bytes" << std::endl;
+  std::cout << "total records: " << fl.total_records() << std::endl;
   std::cout << "throughput: "
             << tps::to_bytes_per_sec(fl.total_bytes(), fl.total_time())
-            << " bytes/sec" << std::endl;
+            << " bytes/sec, "
+            << tps::to_bytes_per_sec(fl.total_records(), fl.total_time())
+            << " records/sec" << std::endl;
   return 0;
 }

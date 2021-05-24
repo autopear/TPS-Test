@@ -152,7 +152,7 @@ static size_t get_file_blocks(const std::string &path) {
 }
 
 static size_t to_bytes_per_sec(size_t size, long long time) {
-  double time_in_s = static_cast<double>(time) / 1000000000UL;
+  double time_in_s = static_cast<double>(time) / (1000 * 1000 * 1000);
   return static_cast<size_t>(round(static_cast<double>(size) / time_in_s));
 }
 

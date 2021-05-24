@@ -21,6 +21,7 @@ class FileRead {
         buffered_(buffered),
         num_threads_(num_threads),
         total_ops_(0),
+        total_records_(0),
         total_time_(0),
         total_bytes_(0) {
     bool is_dir;
@@ -46,6 +47,7 @@ class FileRead {
   virtual void start_read() = 0;
 
   size_t total_ops() const { return total_ops_; }
+  size_t total_records() const { return total_records_; }
   long long total_time() const { return total_time_; }
   size_t total_bytes() const { return total_bytes_; }
 
@@ -80,6 +82,8 @@ class FileRead {
     return static_cast<size_t>(ceil(1.0 * a / b)) * b;
   }
 
+  static constexpr size_t IO_ERROR = (size_t)-1;
+
  protected:
   std::string dir_;
   size_t record_size_;
@@ -90,6 +94,7 @@ class FileRead {
   std::vector<std::string> files_;
   std::vector<size_t> file_sizes_;
   size_t total_ops_;
+  size_t total_records_;
   long long total_time_;
   size_t total_bytes_;
 };

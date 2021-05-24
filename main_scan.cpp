@@ -47,16 +47,16 @@ int main(int argc, char *argv[]) {
   }
 
   std::string dir_path;
-  size_t record_size;
-  long long max_time;
-  bool buffered;
-  int num_threads;
+  size_t record_size = 0;
+  long long max_time = 0;
+  bool buffered = true;
+  int num_threads = 1;
   std::pair<size_t, size_t> ex_bouds_i;
   std::pair<double, double> ex_bouds_f;
-  bool int_bound;
+  bool int_bound = true;
   std::pair<double, double> in_bouds;
-  bool seq_file;
-  bool seq_scan;
+  bool seq_file = true;
+  bool seq_scan = true;
 
   for (int i = 1; i < argc; i++) {
     std::pair<std::string, std::string> arg = tps::parse_arg(argv[i]);
@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  std::cout.imbue(std::locale(""));
+  std::cout.imbue(std::locale("en_US.UTF-8"));
   if (int_bound) {
     tps::FileScan fs(dir_path, record_size, max_time, buffered, num_threads,
                      ex_bouds_i, in_bouds, seq_file, seq_scan);
@@ -160,7 +160,9 @@ int main(int argc, char *argv[]) {
     std::cout << "total files: " << fs.total_files() << std::endl;
     std::cout << "throughput: "
               << tps::to_bytes_per_sec(fs.total_bytes(), fs.total_time())
-              << " bytes/sec" << std::endl;
+              << " bytes/sec, "
+              << tps::to_bytes_per_sec(fs.total_records(), fs.total_time())
+              << " records/sec" << std::endl;
   } else {
     tps::FileScan fs(dir_path, record_size, max_time, buffered, num_threads,
                      ex_bouds_f, in_bouds, seq_file, seq_scan);
@@ -172,7 +174,9 @@ int main(int argc, char *argv[]) {
     std::cout << "total files: " << fs.total_files() << std::endl;
     std::cout << "throughput: "
               << tps::to_bytes_per_sec(fs.total_bytes(), fs.total_time())
-              << " bytes/sec" << std::endl;
+              << " bytes/sec, "
+              << tps::to_bytes_per_sec(fs.total_records(), fs.total_time())
+              << " records/sec" << std::endl;
   }
 
   return 0;

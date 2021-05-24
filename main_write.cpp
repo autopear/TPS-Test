@@ -32,9 +32,9 @@ int main(int argc, char *argv[]) {
   }
 
   std::string dir_path;
-  size_t total_size;
-  size_t file_size;
-  bool sequential;
+  size_t total_size = 0;
+  size_t file_size = 0;
+  bool sequential = true;
 
   for (int i = 1; i < argc; i++) {
     std::pair<std::string, std::string> arg = tps::parse_arg(argv[i]);
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
 
   size_t total_written = 0;
   size_t total_time = 0;
-  std::cout.imbue(std::locale(""));
+  std::cout.imbue(std::locale("en_US.UTF-8"));
   for (std::string f : files) {
     size_t fsize = tps::get_file_size(dir_path + "/" + f);
     std::cout << "file=" << f << ", size=" << fsize << ", time=" << results[f]

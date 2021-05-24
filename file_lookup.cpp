@@ -40,7 +40,8 @@ void FileLookup::do_read() {
 
   size_t blk_size = get_block_size();
   bool single_file = files_.size() == 1;
-  size_t buf_size = buffered_ ? record_size_ : align_buf(record_size_, blk_size);
+  size_t buf_size =
+      buffered_ ? record_size_ : align_buf(record_size_, blk_size);
   char *buf = new char[buf_size];
 
   int flags = O_RDONLY;
@@ -63,13 +64,14 @@ void FileLookup::do_read() {
     if (rpos > 0 && lseek(fd, rpos, SEEK_SET) == -1)
       throw IOException("Filed to seek " + files_[ridx] + ", error " +
                         std::to_string(errno));
-    if (read(fd, buf, buf_size) == -1)
+    size_t bytes_read = read(fd, buf, buf_size);
+    if (bytes_read == IO_ERROR)
       throw IOException("Filed to read " + files_[ridx] + ", error " +
                         std::to_string(errno));
     close(fd);
 
     local_ops++;
-    local_bytes += record_size_;
+    local_bytes += bytes_read;
 
     timer.stop();
     if (timer.elapsed_ns() >= max_time_) break;
@@ -83,6 +85,7 @@ void FileLookup::update_stats(long long time, size_t ops, size_t bytes) {
   const std::lock_guard<std::mutex> lock(mtx_);
   if (time > total_time_) total_time_ = time;
   total_ops_ += ops;
+  total_records_ += ops;
   total_bytes_ += bytes;
 }
 

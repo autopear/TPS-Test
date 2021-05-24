@@ -27,7 +27,6 @@ class FileScan : public FileRead {
 
   void start_read();
 
-  size_t total_records() const { return total_records_; }
   size_t total_files() const { return total_files_; }
 
  private:
@@ -40,7 +39,6 @@ class FileScan : public FileRead {
   bool seq_scan_;
   bool full_scan_;
 
-  size_t total_records_;
   size_t total_files_;
 
   static void rand_read_info(size_t *pos, size_t *read_size, size_t file_size,

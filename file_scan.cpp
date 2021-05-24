@@ -22,8 +22,7 @@ FileScan::FileScan(const std::string dir_path, size_t record_size,
       seq_files_(sequential_files),
       seq_scan_(sequential_scan),
       full_scan_(false),
-      total_files_(0),
-      total_records_(0) {
+      total_files_(0) {
   if (files_.size() == 1) {
     min_files_ = 1;
     max_files_ = 1;
@@ -67,8 +66,7 @@ FileScan::FileScan(const std::string dir_path, size_t record_size,
       seq_files_(sequential_files),
       seq_scan_(sequential_scan),
       full_scan_(false),
-      total_files_(0),
-      total_records_(0) {
+      total_files_(0) {
   if (files_.size() == 1) {
     min_files_ = 1;
     max_files_ = 1;
@@ -157,17 +155,13 @@ void FileScan::do_read() {
   int flags = O_RDONLY;
   if (!buffered_) flags |= O_DIRECT;
 
-  bool terminated = false;
-
   HighResTimer timer;
   timer.start();
   if (files_.size() == 1) {
     std::string picked_file = dir_ + "/" + files_[0];
     size_t fsize = file_sizes_[0];
 
-    while (!terminated) {
-      size_t performed_bytes = 0;
-
+    while (true) {
       int fd;
       if ((fd = open(picked_file.c_str(), flags)) == -1) {
         throw IOException("Filed to open " + picked_file + ", error " +
@@ -187,46 +181,35 @@ void FileScan::do_read() {
                        buffered_ ? record_size_ : blk_size);
       }
 
-      size_t bytes_to_read = align_floor(len, record_size_);
-      size_t records_to_read = bytes_to_read / record_size_;
-
       if (pos > 0 && lseek(fd, pos, SEEK_SET) == -1) {
         throw IOException("Filed to seek " + picked_file + ", error " +
                           std::to_string(errno));
       }
 
-      while (!terminated && len > 0) {
-        int ret = read(fd, buf, buf_size);
-        if (ret == 0) break;
-        if (ret < 0) {
+      size_t records_read =
+          static_cast<size_t>(floor(1.0 * len / record_size_));
+      while (len > 0) {
+        size_t bytes_read = read(fd, buf, buf_size);
+        if (bytes_read == IO_ERROR) {
           throw IOException("Filed to read " + picked_file + ", error " +
                             std::to_string(errno));
         }
-        len -= ret;
-        performed_bytes += ret;
-
-        timer.stop();
-        if (timer.elapsed_ns() >= max_time_) {
-          terminated = true;
-          break;
-        }
+        len -= bytes_read;
+        local_bytes += bytes_read;
       }
       close(fd);
 
-      performed_bytes = align_floor(performed_bytes, record_size_);
-
       local_ops++;
-      local_bytes += performed_bytes;
-      local_records += performed_bytes / record_size_;
+      local_records += records_read;
       local_files++;
-      if (!terminated) timer.stop();
-      if (terminated || timer.elapsed_ns() >= max_time_) break;
+      timer.stop();
+      if (timer.elapsed_ns() >= max_time_) break;
     }
   } else {
     std::vector<size_t> indexes(files_.size());
     std::iota(std::begin(indexes), std::end(indexes), 0);
 
-    while (!terminated) {
+    while (true) {
       size_t performed_bytes = 0;
       size_t performed_files = 0;
 
@@ -280,15 +263,10 @@ void FileScan::do_read() {
         }
       }
 
-      size_t bytes_to_read = 0;
+      size_t records_read = 0;
       for (auto it : lengths) {
-        bytes_to_read += align_floor(it.second, record_size_);
-      }
-
-      timer.stop();
-      if (timer.elapsed_ns() >= max_time_) {
-          terminated = true;
-          break;
+        records_read +=
+            static_cast<size_t>(floor(1.0 * it.second / record_size_));
       }
 
       if (seq_scan_) {
@@ -306,25 +284,17 @@ void FileScan::do_read() {
             throw IOException("Filed to seek " + picked_file + ", error " +
                               std::to_string(errno));
           }
-          while (!terminated && len > 0) {
-            int ret = read(fd, buf, buf_size);
-            if (ret == 0) break;
-            if (ret < 0) {
+          while (len > 0) {
+            size_t bytes_read = read(fd, buf, buf_size);
+            if (bytes_read == 0) break;
+            if (bytes_read == IO_ERROR) {
               throw IOException("Filed to read " + picked_file + ", error " +
                                 std::to_string(errno));
             }
-            len -= ret;
-            performed_bytes += ret;
-
-            timer.stop();
-            if (timer.elapsed_ns() >= max_time_) {
-              terminated = true;
-              break;
-            }
+            len -= bytes_read;
+            local_bytes += bytes_read;
           }
           close(fd);
-          performed_files++;
-          if (terminated) break;
         }
       } else {
         std::unordered_map<size_t, int> fds;
@@ -341,15 +311,9 @@ void FileScan::do_read() {
                               std::to_string(errno));
           }
           fds.insert({fidx, fd});
-
-          timer.stop();
-          if (timer.elapsed_ns() >= max_time_) {
-            terminated = true;
-            break;
-          }
         }
 
-        while (!terminated && !lengths.empty()) {
+        while (!lengths.empty()) {
           size_t r = get_round(pos_dist(gen), 0, lengths.size() - 1);
           auto rand_it = std::next(std::begin(lengths), r);
           size_t rand_fidx = rand_it->first;
@@ -361,37 +325,27 @@ void FileScan::do_read() {
           int fd = fds[rand_fidx];
 
           for (size_t i = 0; i < rand_reads; i++) {
-            int ret = read(fd, buf, buf_size);
-            if (ret == 0) break;
-            if (ret < 0) {
+            size_t bytes_read = read(fd, buf, buf_size);
+            if (bytes_read == 0) break;
+            if (bytes_read == IO_ERROR) {
               std::string picked_file = dir_ + "/" + files_[rand_fidx];
               throw IOException("Filed to read " + picked_file + ", error " +
                                 std::to_string(errno));
             }
-            performed_bytes += ret;
-
-            timer.stop();
-            if (timer.elapsed_ns() >= max_time_) {
-              terminated = true;
-              break;
-            }
+            local_bytes += bytes_read;
           }
 
           if (num_reads == rand_reads) lengths.erase(rand_fidx);
         }
 
         for (auto it : fds) close(it.second);
-        performed_files += fds.size();
       }
 
-      performed_bytes = align_floor(performed_bytes, record_size_);
-
       local_ops++;
-      local_bytes += performed_bytes;
-      local_records += (performed_bytes / record_size_);
-      local_files += performed_files;
-      if (!terminated) timer.stop();
-      if (terminated || timer.elapsed_ns() >= max_time_) break;
+      local_files += rand_num_files;
+      local_records += records_read;
+      timer.stop();
+      if (timer.elapsed_ns() >= max_time_) break;
     }
   }
 
