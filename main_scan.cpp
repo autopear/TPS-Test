@@ -170,12 +170,12 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  std::cout.imbue(std::locale("en_US.UTF-8"));
   if (int_bound) {
     tps::FileScan fs(dir_path, record_size, max_time, buffered, num_threads,
                      ex_bouds_i, in_bouds, seq_file, seq_scan, full_middle);
     fs.print_arguments();
     fs.start_read();
+    std::cout.imbue(std::locale("en_US.UTF-8"));
     std::cout << "operations: " << fs.total_ops() << std::endl;
     std::cout << "total time: " << fs.total_time() << " ns" << std::endl;
     std::cout << "total size: " << fs.total_bytes() << " bytes" << std::endl;
@@ -191,6 +191,7 @@ int main(int argc, char *argv[]) {
                      ex_bouds_f, in_bouds, seq_file, seq_scan, full_middle);
     fs.print_arguments();
     fs.start_read();
+    std::cout.imbue(std::locale("en_US.UTF-8"));
     std::cout << "operations: " << fs.total_ops() << std::endl;
     std::cout << "total time: " << fs.total_time() << " ns" << std::endl;
     std::cout << "total size: " << fs.total_bytes() << " bytes" << std::endl;
