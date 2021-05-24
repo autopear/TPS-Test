@@ -69,8 +69,8 @@ int main(int argc, char *argv[]) {
   fl.start_read();
   std::cout.imbue(std::locale(""));
   std::cout << "operations: " << fl.total_ops() << std::endl;
-  std::cout << "total time: " << fl.total_time() << std::endl;
-  std::cout << "total size: " << fl.total_bytes() << std::endl;
+  std::cout << "total time: " << fl.total_time() << " ns" << std::endl;
+  std::cout << "total size: " << fl.total_bytes() << " bytes" << std::endl;
   std::cout << "throughput: "
             << tps::to_bytes_per_sec(fl.total_bytes(), fl.total_time())
             << " bytes/sec" << std::endl;

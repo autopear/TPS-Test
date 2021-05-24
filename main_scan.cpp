@@ -154,8 +154,8 @@ int main(int argc, char *argv[]) {
                      ex_bouds_i, in_bouds, seq_file, seq_scan);
     fs.start_read();
     std::cout << "operations: " << fs.total_ops() << std::endl;
-    std::cout << "total time: " << fs.total_time() << std::endl;
-    std::cout << "total size: " << fs.total_bytes() << std::endl;
+    std::cout << "total time: " << fs.total_time() << " ns" << std::endl;
+    std::cout << "total size: " << fs.total_bytes() << " bytes" << std::endl;
     std::cout << "total records: " << fs.total_records() << std::endl;
     std::cout << "total files: " << fs.total_files() << std::endl;
     std::cout << "throughput: "
@@ -166,8 +166,8 @@ int main(int argc, char *argv[]) {
                      ex_bouds_f, in_bouds, seq_file, seq_scan);
     fs.start_read();
     std::cout << "operations: " << fs.total_ops() << std::endl;
-    std::cout << "total time: " << fs.total_time() << std::endl;
-    std::cout << "total size: " << fs.total_bytes() << std::endl;
+    std::cout << "total time: " << fs.total_time() << " ns" << std::endl;
+    std::cout << "total size: " << fs.total_bytes() << " bytes" << std::endl;
     std::cout << "total records: " << fs.total_records() << std::endl;
     std::cout << "total files: " << fs.total_files() << std::endl;
     std::cout << "throughput: "
