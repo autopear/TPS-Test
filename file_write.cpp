@@ -102,4 +102,11 @@ std::unordered_map<std::string, long long> FileWrite::write() {
   return ret;
 }
 
+void FileWrite::print_arguments() {
+  std::cout << "# dir = " << dir_ << std::endl;
+  std::cout << "# total-size = " << total_ << std::endl;
+  std::cout << "# file-size = " << size_ << std::endl;
+  std::cout << "# sequential = " << (seq_ ? "true" : "false") << std::endl;
+}
+
 }  // namespace tps

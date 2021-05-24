@@ -17,16 +17,18 @@ FileScan::FileScan(const std::string dir_path, size_t record_size,
                    long long max_time, bool buffered, int num_threads,
                    const std::pair<size_t, size_t> &ex_bounds,
                    const std::pair<double, double> &in_bounds,
-                   bool sequential_files, bool sequential_scan)
+                   bool sequential_files, bool sequential_scan,
+                   bool full_middle)
     : FileRead(dir_path, record_size, max_time, buffered, num_threads),
-      seq_files_(sequential_files),
+      seq_file_(sequential_files),
       seq_scan_(sequential_scan),
+      full_middle_(full_middle),
       full_scan_(false),
       total_files_(0) {
   if (files_.size() == 1) {
     min_files_ = 1;
     max_files_ = 1;
-    seq_files_ = true;
+    seq_file_ = true;
     seq_scan_ = true;
   } else {
     min_files_ = ex_bounds.first;
@@ -61,16 +63,18 @@ FileScan::FileScan(const std::string dir_path, size_t record_size,
                    long long max_time, bool buffered, int num_threads,
                    const std::pair<double, double> &ex_bounds,
                    const std::pair<double, double> &in_bounds,
-                   bool sequential_files, bool sequential_scan)
+                   bool sequential_files, bool sequential_scan,
+                   bool full_middle)
     : FileRead(dir_path, record_size, max_time, buffered, num_threads),
-      seq_files_(sequential_files),
+      seq_file_(sequential_files),
       seq_scan_(sequential_scan),
+      full_middle_(full_middle),
       full_scan_(false),
       total_files_(0) {
   if (files_.size() == 1) {
     min_files_ = 1;
     max_files_ = 1;
-    seq_files_ = true;
+    seq_file_ = true;
     seq_scan_ = true;
   } else {
     if (ex_bounds.first < 0.0 || ex_bounds.second < 0.0) {
@@ -214,7 +218,7 @@ void FileScan::do_read() {
       size_t performed_files = 0;
 
       std::vector<size_t> rand_indexes = indexes;
-      if (!seq_files_)
+      if (!seq_file_)
         std::shuffle(rand_indexes.begin(), rand_indexes.end(), gen);
       size_t rand_num_files =
           min_files_ == max_files_ ? min_files_ : file_dist(gen);
@@ -225,7 +229,7 @@ void FileScan::do_read() {
       size_t pos;
       size_t len;
 
-      if (seq_files_) {
+      if (full_middle_) {
         size_t fidx = rand_indexes[0];
         double size_ratio =
             min_ratio_ == max_ratio_ ? min_ratio_ : ratio_dist(gen);
@@ -363,6 +367,19 @@ void FileScan::update_stats(long long time, size_t ops, size_t bytes,
   total_bytes_ += bytes;
   total_records_ += records;
   total_files_ += files;
+}
+
+void FileScan::print_arguments() {
+  print_argument("dir", dir_);
+  print_argument("record-size", record_size_);
+  print_argument("max-time", std::to_string(max_time_));
+  print_argument("buffered", buffered_);
+  print_argument("threads", std::to_string(num_threads_));
+  print_argument("file-ratio", min_ratio_, max_ratio_);
+  print_argument("size-ratio", min_files_, max_files_);
+  print_argument("seq-file", seq_file_);
+  print_argument("seq-scan", seq_scan_);
+  print_argument("full-middle", full_middle_);
 }
 
 }  // namespace tps

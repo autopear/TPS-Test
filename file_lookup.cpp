@@ -89,4 +89,12 @@ void FileLookup::update_stats(long long time, size_t ops, size_t bytes) {
   total_bytes_ += bytes;
 }
 
+void FileLookup::print_arguments() {
+  print_argument("dir", dir_);
+  print_argument("record-size", record_size_);
+  print_argument("max-time", std::to_string(max_time_));
+  print_argument("buffered", buffered_);
+  print_argument("threads", std::to_string(num_threads_));
+}
+
 }  // namespace tps

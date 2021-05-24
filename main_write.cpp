@@ -70,6 +70,7 @@ int main(int argc, char *argv[]) {
   }
 
   tps::FileWrite fw(dir_path, total_size, file_size, sequential);
+  fw.print_arguments();
   std::unordered_map<std::string, long long> results = fw.write();
   std::vector<std::string> files;
   files.reserve(results.size());

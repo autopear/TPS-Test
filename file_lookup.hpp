@@ -17,6 +17,8 @@ class FileLookup : public FileRead {
 
   void start_read();
 
+  void print_arguments();
+
  private:
   void do_read();
   void update_stats(long long time, size_t ops, size_t bytes);

@@ -6,7 +6,7 @@
 #include "helper.hpp"
 
 int main(int argc, char *argv[]) {
-  if (argc != 10) {
+  if (argc != 11) {
     std::cout << "Usage: " << argv[0] << " [key=value]..." << std::endl;
     std::cout << "       Keys:" << std::endl;
     std::cout << "            -      dir: Path to the output directory."
@@ -43,6 +43,11 @@ int main(int argc, char *argv[]) {
     std::cout
         << "                        {true, t, yes, y, 1, false, f, no, n, 0}"
         << std::endl;
+    std::cout << "         - full-middle: If true, full scan middle files."
+              << std::endl;
+    std::cout
+        << "                        {true, t, yes, y, 1, false, f, no, n, 0}"
+        << std::endl;
     return 0;
   }
 
@@ -57,6 +62,7 @@ int main(int argc, char *argv[]) {
   std::pair<double, double> in_bouds;
   bool seq_file = true;
   bool seq_scan = true;
+  bool full_middle = false;
 
   for (int i = 1; i < argc; i++) {
     std::pair<std::string, std::string> arg = tps::parse_arg(argv[i]);
@@ -138,11 +144,27 @@ int main(int argc, char *argv[]) {
                   << std::endl;
         return -1;
       }
+    } else if (arg.first.compare("full-middle") == 0) {
+      std::string value = tps::to_upper(arg.second);
+      if (value.compare("TRUE") == 0 || value.compare("T") == 0 ||
+          value.compare("YES") == 0 || value.compare("Y") == 0 ||
+          value.compare("1") == 0)
+        full_middle = true;
+      else if (value.compare("FALSE") == 0 || value.compare("F") == 0 ||
+               value.compare("NO") == 0 || value.compare("N") == 0 ||
+               value.compare("0") == 0)
+        full_middle = false;
+      else {
+        std::cerr << "Value of 'full-middle' is invalid. Valid values are "
+                     "{true, t, yes, y, 1, false, f, no, n, 0}."
+                  << std::endl;
+        return -1;
+      }
     } else {
       std::cerr << "Invalid key '" << arg.first
                 << "'. Valid keys are "
                    "{dir, record-size, max-time, buffered, threads, "
-                   "file-ratio, size-ratio, seq-file, seq-scan}."
+                   "file-ratio, size-ratio, seq-file, seq-scan, full-middle}."
                 << std::endl;
       return -1;
     }
@@ -151,7 +173,8 @@ int main(int argc, char *argv[]) {
   std::cout.imbue(std::locale("en_US.UTF-8"));
   if (int_bound) {
     tps::FileScan fs(dir_path, record_size, max_time, buffered, num_threads,
-                     ex_bouds_i, in_bouds, seq_file, seq_scan);
+                     ex_bouds_i, in_bouds, seq_file, seq_scan, full_middle);
+    fs.print_arguments();
     fs.start_read();
     std::cout << "operations: " << fs.total_ops() << std::endl;
     std::cout << "total time: " << fs.total_time() << " ns" << std::endl;
@@ -165,7 +188,8 @@ int main(int argc, char *argv[]) {
               << " records/sec" << std::endl;
   } else {
     tps::FileScan fs(dir_path, record_size, max_time, buffered, num_threads,
-                     ex_bouds_f, in_bouds, seq_file, seq_scan);
+                     ex_bouds_f, in_bouds, seq_file, seq_scan, full_middle);
+    fs.print_arguments();
     fs.start_read();
     std::cout << "operations: " << fs.total_ops() << std::endl;
     std::cout << "total time: " << fs.total_time() << " ns" << std::endl;

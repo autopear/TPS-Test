@@ -13,6 +13,8 @@ class FileWrite {
 
   std::unordered_map<std::string, long long> write();
 
+  void print_arguments();
+
  private:
   std::string dir_;
   size_t total_;

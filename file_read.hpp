@@ -84,6 +84,29 @@ class FileRead {
 
   static constexpr size_t IO_ERROR = (size_t)-1;
 
+  void print_argument(const std::string &key, const std::string &value) {
+    std::cout << "# " << key << " = " << value << std::endl;
+  }
+
+  void print_argument(const std::string &key, size_t value) {
+    std::cout << "# " << key << " = " << value << std::endl;
+  }
+
+  void print_argument(const std::string &key, bool value) {
+    std::cout << "# " << key << " = " << (value ? "true" : "false")
+              << std::endl;
+  }
+
+  void print_argument(const std::string &key, size_t v1, size_t v2) {
+    std::cout << "# " << key << " = [" << v1 << ", " << v2 << "]" << std::endl;
+  }
+
+  void print_argument(const std::string &key, double v1, double v2) {
+    std::cout << "# " << key << " = [" << v1 << ", " << v2 << "]" << std::endl;
+  }
+
+  virtual void print_arguments() = 0;
+
  protected:
   std::string dir_;
   size_t record_size_;

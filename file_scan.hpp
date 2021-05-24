@@ -16,33 +16,35 @@ class FileScan : public FileRead {
   FileScan(const std::string dir_path, size_t record_size, long long max_time,
            bool buffered, int num_threads,
            const std::pair<size_t, size_t> &ex_bounds,
-           const std::pair<double, double> &in_bounds,
-           bool sequential_files, bool sequential_scan);
+           const std::pair<double, double> &in_bounds, bool sequential_files,
+           bool sequential_scan, bool full_middle);
   FileScan(const std::string dir_path, size_t record_size, long long max_time,
            bool buffered, int num_threads,
            const std::pair<double, double> &ex_bounds,
-           const std::pair<double, double> &in_bounds,
-           bool sequential_files, bool sequential_scan);
-
+           const std::pair<double, double> &in_bounds, bool sequential_files,
+           bool sequential_scan, bool full_middle);
 
   void start_read();
 
   size_t total_files() const { return total_files_; }
+
+  void print_arguments();
 
  private:
   size_t min_files_;
   size_t max_files_;
   double min_ratio_;
   double max_ratio_;
-  bool full_middle_;
-  bool seq_files_;
+  bool seq_file_;
   bool seq_scan_;
+  bool full_middle_;
   bool full_scan_;
 
   size_t total_files_;
 
   static void rand_read_info(size_t *pos, size_t *read_size, size_t file_size,
-                             double pos_ratio, double size_ratio, size_t align_size);
+                             double pos_ratio, double size_ratio,
+                             size_t align_size);
 
   void do_read();
   void update_stats(long long time, size_t ops, size_t bytes, size_t records,

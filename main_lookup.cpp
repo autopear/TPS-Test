@@ -66,6 +66,7 @@ int main(int argc, char *argv[]) {
   }
 
   tps::FileLookup fl(dir_path, record_size, max_time, buffered, num_threads);
+  fl.print_arguments();
   fl.start_read();
   std::cout.imbue(std::locale("en_US.UTF-8"));
   std::cout << "operations: " << fl.total_ops() << std::endl;
