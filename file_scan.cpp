@@ -7,6 +7,7 @@
 #include <random>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "timer.hpp"
@@ -159,17 +160,25 @@ void FileScan::do_read() {
   int flags = O_RDONLY;
   if (!buffered_) flags |= O_DIRECT;
 
+  bool running = true;
+
   HighResTimer timer;
   timer.start();
   if (files_.size() == 1) {
     std::string picked_file = dir_ + "/" + files_[0];
     size_t fsize = file_sizes_[0];
 
-    while (true) {
+    while (running) {
       int fd;
       if ((fd = open(picked_file.c_str(), flags)) == -1) {
-        throw IOException("Filed to open " + picked_file + ", error " +
+        throw IOException("Failed to open " + picked_file + ", error " +
                           std::to_string(errno));
+      }
+      local_files++;
+      timer.stop();
+      if (timer.elapsed_ns() >= max_time_) {
+        running = false;
+        break;
       }
 
       size_t pos;
@@ -185,44 +194,54 @@ void FileScan::do_read() {
                        buffered_ ? record_size_ : blk_size);
       }
 
-      if (pos > 0 && lseek(fd, pos, SEEK_SET) == -1) {
-        throw IOException("Filed to seek " + picked_file + ", error " +
-                          std::to_string(errno));
-      }
-
-      size_t records_read =
-          static_cast<size_t>(floor(1.0 * len / record_size_));
-      while (len > 0) {
-        size_t bytes_read = read(fd, buf, buf_size);
-        if (bytes_read == IO_ERROR) {
-          throw IOException("Filed to read " + picked_file + ", error " +
+      if (running) {
+        if (pos > 0 && lseek(fd, pos, SEEK_SET) == -1) {
+          throw IOException("Failed to seek " + picked_file + ", error " +
                             std::to_string(errno));
         }
-        len -= bytes_read;
-        local_bytes += bytes_read;
+        timer.stop();
+        if (timer.elapsed_ns() >= max_time_) running = false;
+      }
+
+      if (running) {
+        size_t records_read =
+            static_cast<size_t>(floor(1.0 * len / record_size_));
+        while (running && len > 0) {
+          size_t bytes_read = read(fd, buf, buf_size);
+          if (bytes_read == IO_ERROR) {
+            throw IOException("Failed to read " + picked_file + ", error " +
+                              std::to_string(errno));
+          }
+          len -= bytes_read;
+          local_bytes += bytes_read;
+
+          timer.stop();
+          if (timer.elapsed_ns() >= max_time_) running = false;
+        }
       }
       close(fd);
 
       local_ops++;
-      local_records += records_read;
-      local_files++;
-      timer.stop();
-      if (timer.elapsed_ns() >= max_time_) break;
+      if (running) {
+        timer.stop();
+        if (timer.elapsed_ns() >= max_time_) break;
+      }
     }
   } else {
-    std::vector<size_t> indexes(files_.size());
-    std::iota(std::begin(indexes), std::end(indexes), 0);
-
-    while (true) {
-      size_t performed_bytes = 0;
-      size_t performed_files = 0;
-
-      std::vector<size_t> rand_indexes = indexes;
-      if (!seq_file_)
-        std::shuffle(rand_indexes.begin(), rand_indexes.end(), gen);
+    while (running) {
       size_t rand_num_files =
           min_files_ == max_files_ ? min_files_ : file_dist(gen);
-      rand_indexes.resize(rand_num_files);
+
+      std::vector<size_t> rand_indexes;
+      std::unordered_set<size_t> uniques;
+      rand_indexes.reserve(rand_num_files);
+
+      while (uniques.size() < rand_num_files) {
+        size_t ridx = get_round(pos_dist(gen), 0, files_.size() - 1);
+        if (uniques.insert(ridx).second) rand_indexes.push_back(ridx);
+      }
+
+      if (seq_file_) std::sort(rand_indexes.begin(), rand_indexes.end());
       std::unordered_map<size_t, size_t> positions;
       std::unordered_map<size_t, size_t> lengths;
 
@@ -267,12 +286,6 @@ void FileScan::do_read() {
         }
       }
 
-      size_t records_read = 0;
-      for (auto it : lengths) {
-        records_read +=
-            static_cast<size_t>(floor(1.0 * it.second / record_size_));
-      }
-
       if (seq_scan_) {
         for (size_t fidx : rand_indexes) {
           std::string picked_file = dir_ + "/" + files_[fidx];
@@ -281,24 +294,41 @@ void FileScan::do_read() {
 
           int fd;
           if ((fd = open(picked_file.c_str(), flags)) == -1) {
-            throw IOException("Filed to open " + picked_file + ", error " +
+            throw IOException("Failed to open " + picked_file + ", error " +
                               std::to_string(errno));
           }
-          if (pos > 0 && lseek(fd, pos, SEEK_SET) == -1) {
-            throw IOException("Filed to seek " + picked_file + ", error " +
-                              std::to_string(errno));
+          local_files++;
+          timer.stop();
+          if (timer.elapsed_ns() >= max_time_) running = false;
+
+          if (running) {
+            if (pos > 0 && lseek(fd, pos, SEEK_SET) == -1) {
+              throw IOException("Failed to seek " + picked_file + ", error " +
+                                std::to_string(errno));
+            }
+            timer.stop();
+            if (timer.elapsed_ns() >= max_time_) running = false;
           }
-          while (len > 0) {
+
+          while (running && len > 0) {
             size_t bytes_read = read(fd, buf, buf_size);
             if (bytes_read == 0) break;
             if (bytes_read == IO_ERROR) {
-              throw IOException("Filed to read " + picked_file + ", error " +
+              throw IOException("Failed to read " + picked_file + ", error " +
                                 std::to_string(errno));
             }
             len -= bytes_read;
             local_bytes += bytes_read;
           }
           close(fd);
+
+          if (!running) break;
+
+          timer.stop();
+          if (timer.elapsed_ns() >= max_time_) {
+            running = false;
+            break;
+          }
         }
       } else {
         std::unordered_map<size_t, int> fds;
@@ -306,18 +336,33 @@ void FileScan::do_read() {
           std::string picked_file = dir_ + "/" + files_[fidx];
           int fd;
           if ((fd = open(picked_file.c_str(), flags)) == -1) {
-            throw IOException("Filed to open " + picked_file + ", error " +
+            throw IOException("Failed to open " + picked_file + ", error " +
                               std::to_string(errno));
           }
-          pos = positions[fidx];
-          if (pos > 0 && lseek(fd, pos, SEEK_SET) == -1) {
-            throw IOException("Filed to seek " + picked_file + ", error " +
-                              std::to_string(errno));
+          local_files++;
+          timer.stop();
+          if (timer.elapsed_ns() >= max_time_) running = false;
+
+          if (running) {
+            pos = positions[fidx];
+            if (pos > 0 && lseek(fd, pos, SEEK_SET) == -1) {
+              std::cout << "fidx = " << fidx << picked_file << std::endl;
+              throw IOException("Failed to seek " + picked_file + ", error " +
+                                std::to_string(errno));
+            }
+            fds.insert({fidx, fd});
           }
-          fds.insert({fidx, fd});
+
+          if (!running) break;
+
+          timer.stop();
+          if (timer.elapsed_ns() >= max_time_) {
+            running = false;
+            break;
+          }
         }
 
-        while (!lengths.empty()) {
+        while (running && !lengths.empty()) {
           size_t r = get_round(pos_dist(gen), 0, lengths.size() - 1);
           auto rand_it = std::next(std::begin(lengths), r);
           size_t rand_fidx = rand_it->first;
@@ -328,15 +373,18 @@ void FileScan::do_read() {
 
           int fd = fds[rand_fidx];
 
-          for (size_t i = 0; i < rand_reads; i++) {
+          for (size_t i = 0; running && i < rand_reads; i++) {
             size_t bytes_read = read(fd, buf, buf_size);
             if (bytes_read == 0) break;
             if (bytes_read == IO_ERROR) {
               std::string picked_file = dir_ + "/" + files_[rand_fidx];
-              throw IOException("Filed to read " + picked_file + ", error " +
+              throw IOException("Failed to read " + picked_file + ", error " +
                                 std::to_string(errno));
             }
             local_bytes += bytes_read;
+
+            timer.stop();
+            if (timer.elapsed_ns() >= max_time_) running = false;
           }
 
           if (num_reads == rand_reads) lengths.erase(rand_fidx);
@@ -346,16 +394,17 @@ void FileScan::do_read() {
       }
 
       local_ops++;
-      local_files += rand_num_files;
-      local_records += records_read;
-      timer.stop();
-      if (timer.elapsed_ns() >= max_time_) break;
+      if (running) {
+        timer.stop();
+        if (timer.elapsed_ns() >= max_time_) break;
+      }
     }
   }
 
   delete[] buf;
 
-  update_stats(timer.elapsed_ns(), local_ops, local_bytes, local_records,
+  update_stats(timer.elapsed_ns(), local_ops, local_bytes,
+               static_cast<size_t>(floor(1.0 * local_bytes / record_size_)),
                local_files);
 }
 
@@ -375,8 +424,8 @@ void FileScan::print_arguments() {
   print_argument("max-time", std::to_string(max_time_));
   print_argument("buffered", buffered_);
   print_argument("threads", std::to_string(num_threads_));
-  print_argument("file-ratio", min_ratio_, max_ratio_);
-  print_argument("size-ratio", min_files_, max_files_);
+  print_argument("file-ratio", min_files_, max_files_);
+  print_argument("size-ratio", min_ratio_, max_ratio_);
   print_argument("seq-file", seq_file_);
   print_argument("seq-scan", seq_scan_);
   print_argument("full-middle", full_middle_);
