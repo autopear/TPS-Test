@@ -71,32 +71,24 @@ std::unordered_map<std::string, long long> FileWrite::write() {
   ret.reserve(files.size());
   HighResTimer timer;
   for (std::string name : files) {
-    long long total_time = 0;
-
     timer.start();
     std::fstream fs;
     fs.open(dir_ + "/" + name, std::ios::out | std::ios::binary);
-    timer.stop();
-    total_time += timer.elapsed_ns();
 
     size_t remains = size_;
     while (remains > 0) {
       size_t r = std::min(buf_size, remains);
       rs.read(buf, r);
-      timer.start();
       fs.write(buf, r);
-      timer.stop();
-      total_time += timer.elapsed_ns();
       remains -= r;
     }
 
-    timer.start();
     fs.flush();
     fs.close();
-    timer.stop();
-    total_time += timer.elapsed_ns();
 
-    ret.insert({name, total_time});
+    timer.stop();
+
+    ret.insert({name, timer.elapsed_ns()});
   }
   delete[] buf;
   return ret;

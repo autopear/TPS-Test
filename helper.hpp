@@ -151,9 +151,9 @@ static size_t get_file_blocks(const std::string &path) {
   return static_cast<size_t>(st.st_blocks);
 }
 
-static size_t to_bytes_per_sec(size_t size, long long time) {
-  double time_in_s = static_cast<double>(time) / (1000 * 1000 * 1000);
-  return static_cast<size_t>(round(static_cast<double>(size) / time_in_s));
+static size_t to_bytes_per_sec(size_t size, long long time_in_ns) {
+  double time_in_s = 0.001 * time_in_ns * 0.001 * 0.001;
+  return static_cast<size_t>(round(1.0 * size / time_in_s));
 }
 
 }  // namespace tps

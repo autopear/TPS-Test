@@ -143,7 +143,6 @@ void FileScan::rand_read_info(size_t *pos, size_t *read_size, size_t file_size,
 void FileScan::do_read() {
   size_t local_ops = 0;
   size_t local_bytes = 0;
-  size_t local_records = 0;
   size_t local_files = 0;
 
   std::random_device rd;
