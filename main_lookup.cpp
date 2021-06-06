@@ -7,20 +7,18 @@
 int main(int argc, char *argv[]) {
   if (argc != 6) {
     std::cout << "Usage: " << argv[0] << " [key=value]..." << std::endl;
-    std::cout << "       Keys:" << std::endl;
-    std::cout << "            -      dir: Path to the output directory."
+    std::cout << "  Keys:" << std::endl;
+    std::cout << "    -         dir: Path to the output directory."
               << std::endl;
-    std::cout << "         - record-size: Record size." << std::endl;
-    std::cout << "                        e.g. 12, 34b, 2kB, 3MB, 4GB"
+    std::cout << "    - record-size: Record size." << std::endl;
+    std::cout << "                   e.g. 12, 34b, 2kB, 3MB, 4GB" << std::endl;
+    std::cout << "    -    max-time: Max running time." << std::endl;
+    std::cout << "                   e.g. 300, 10{h, min, s, ms, us, ns}"
               << std::endl;
-    std::cout << "         -    max-time: Max running time." << std::endl;
-    std::cout << "                        e.g. 300, 10{h, min, s, ms, us, ns}"
+    std::cout << "    -    buffered: Buffered read." << std::endl;
+    std::cout << "                   {true, t, yes, y, 1, false, f, no, n, 0}"
               << std::endl;
-    std::cout << "         -    buffered: Buffered read." << std::endl;
-    std::cout
-        << "                        {true, t, yes, y, 1, false, f, no, n, 0}"
-        << std::endl;
-    std::cout << "         -     threads: Number of threads." << std::endl;
+    std::cout << "    -     threads: Number of threads." << std::endl;
     return 0;
   }
 

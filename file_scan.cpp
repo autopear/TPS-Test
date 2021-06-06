@@ -16,8 +16,7 @@ namespace tps {
 
 FileScan::FileScan(const std::string dir_path, size_t record_size,
                    long long max_time, bool buffered, int num_threads,
-                   const std::pair<size_t, size_t> &ex_bounds,
-                   const std::pair<double, double> &in_bounds,
+                   const Bounds &ex_bounds, const Bounds &in_bounds,
                    bool sequential_files, bool sequential_scan,
                    bool full_middle)
     : FileRead(dir_path, record_size, max_time, buffered, num_threads),
@@ -32,9 +31,24 @@ FileScan::FileScan(const std::string dir_path, size_t record_size,
     seq_file_ = true;
     seq_scan_ = true;
   } else {
-    min_files_ = ex_bounds.first;
-    max_files_ = ex_bounds.second;
-    if (min_files_ > max_files_) std::swap(min_files_, max_files_);
+    if (ex_bounds.is_ratio) {
+      if (ex_bounds.min_ratio < 0.0 || ex_bounds.max_ratio < 0.0) {
+        throw IOException(
+            "Invalid min_file_ratio " + std::to_string(ex_bounds.min_ratio) +
+            " or max_file_ratio " + std::to_string(ex_bounds.max_ratio));
+      } else if (ex_bounds.min_ratio == 0.0 && ex_bounds.max_ratio == 0.0) {
+        min_files_ = files_.size();
+        max_files_ = min_files_;
+      } else {
+        min_files_ = std::min(files_.size(),
+                              get_ceil(ex_bounds.min_ratio, 0, files_.size()));
+        max_files_ = std::min(files_.size(),
+                              get_ceil(ex_bounds.max_ratio, 0, files_.size()));
+      }
+    } else {
+      min_files_ = ex_bounds.min_size;
+      max_files_ = ex_bounds.max_size;
+    }
     if (min_files_ == 0 && max_files_ > 0) {
       min_files_ = 1;
     } else if (min_files_ == 0 && max_files_ == 0 ||
@@ -45,66 +59,23 @@ FileScan::FileScan(const std::string dir_path, size_t record_size,
       max_files_ = files_.size();
     }
   }
-  min_ratio_ = in_bounds.first;
-  max_ratio_ = in_bounds.second;
-  if (min_ratio_ > max_ratio_) std::swap(min_ratio_, max_ratio_);
-  if (min_ratio_ < 0.0)
-    throw IOException("Invalid min_ratio " + std::to_string(min_ratio_));
-  if (max_ratio_ > 1.0) max_ratio_ = 1.0;
-  if (min_ratio_ == 0.0 && max_ratio_ == 0.0) {
-    min_ratio_ = 1.0;
-    max_ratio_ = 1.0;
-  }
-  if (min_ratio_ == 1.0 && max_ratio_ == 1.0) {
-    full_scan_ = true;
-  }
-}
-
-FileScan::FileScan(const std::string dir_path, size_t record_size,
-                   long long max_time, bool buffered, int num_threads,
-                   const std::pair<double, double> &ex_bounds,
-                   const std::pair<double, double> &in_bounds,
-                   bool sequential_files, bool sequential_scan,
-                   bool full_middle)
-    : FileRead(dir_path, record_size, max_time, buffered, num_threads),
-      seq_file_(sequential_files),
-      seq_scan_(sequential_scan),
-      full_middle_(full_middle),
-      full_scan_(false),
-      total_files_(0) {
-  if (files_.size() == 1) {
-    min_files_ = 1;
-    max_files_ = 1;
-    seq_file_ = true;
-    seq_scan_ = true;
-  } else {
-    if (ex_bounds.first < 0.0 || ex_bounds.second < 0.0) {
-      throw IOException(
-          "Invalid min_file_ratio " + std::to_string(ex_bounds.first) +
-          " or max_file_ratio " + std::to_string(ex_bounds.second));
-    } else if (ex_bounds.first == 0.0 && ex_bounds.second == 0.0) {
-      min_files_ = files_.size();
-      max_files_ = min_files_;
-    } else {
-      min_files_ =
-          std::min(files_.size(), get_ceil(ex_bounds.first, 0, files_.size()));
-      max_files_ =
-          std::min(files_.size(), get_ceil(ex_bounds.second, 0, files_.size()));
-      if (min_files_ > max_files_) std::swap(min_files_, max_files_);
+  size_bounds_ = in_bounds;
+  if (size_bounds_.is_ratio) {
+    if (size_bounds_.min_ratio < 0.0)
+      throw IOException("Invalid min_ratio " +
+                        std::to_string(size_bounds_.min_ratio));
+    if (size_bounds_.max_ratio > 1.0) size_bounds_.max_ratio = 1.0;
+    if (size_bounds_.min_ratio == 0.0 && size_bounds_.max_ratio == 0.0) {
+      size_bounds_.min_ratio = 1.0;
+      size_bounds_.max_ratio = 1.0;
     }
-  }
-  min_ratio_ = in_bounds.first;
-  max_ratio_ = in_bounds.second;
-  if (min_ratio_ > max_ratio_) std::swap(min_ratio_, max_ratio_);
-  if (min_ratio_ < 0.0)
-    throw IOException("Invalid min_ratio " + std::to_string(min_ratio_));
-  if (max_ratio_ > 1.0) max_ratio_ = 1.0;
-  if (min_ratio_ == 0.0 && max_ratio_ == 0.0) {
-    min_ratio_ = 1.0;
-    max_ratio_ = 1.0;
-  }
-  if (min_ratio_ == 1.0 && max_ratio_ == 1.0) {
-    full_scan_ = true;
+    if (size_bounds_.min_ratio == 1.0 && size_bounds_.max_ratio == 1.0) {
+      full_scan_ = true;
+    }
+  } else {
+    if (size_bounds_.min_size == 0 && size_bounds_.max_size == 0) {
+      full_scan_ = true;
+    }
   }
 }
 
@@ -148,13 +119,17 @@ void FileScan::do_read() {
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<size_t> file_dist(min_files_, max_files_);
-  std::uniform_real_distribution<double> ratio_dist(min_ratio_, max_ratio_);
+  std::uniform_real_distribution<double> ratio_dist(size_bounds_.min_size,
+                                                    size_bounds_.max_ratio);
+  std::uniform_int_distribution<size_t> size_dist(size_bounds_.min_size,
+                                                  size_bounds_.max_size);
   std::uniform_real_distribution<double> pos_dist(0.0, 1.0);
 
   size_t blk_size = get_block_size();
   size_t buf_size =
       buffered_ ? record_size_ : align_buf(record_size_, blk_size);
   char *buf = new char[buf_size];
+  size_t align_size = buffered_ ? record_size_ : blk_size;
 
   int flags = O_RDONLY;
   if (!buffered_) flags |= O_DIRECT;
@@ -183,14 +158,24 @@ void FileScan::do_read() {
       size_t pos;
       size_t len;
       if (full_scan_) {
-        rand_read_info(&pos, &len, fsize, 0.0, 1.0,
-                       buffered_ ? record_size_ : blk_size);
-      } else {
-        size_t size_ratio =
-            min_ratio_ == max_ratio_ ? min_ratio_ : ratio_dist(gen);
+        rand_read_info(&pos, &len, fsize, 0.0, 1.0, align_size);
+      } else if (size_bounds_.is_ratio) {
+        size_t size_ratio = size_bounds_.min_ratio == size_bounds_.max_ratio
+                                ? size_bounds_.min_ratio
+                                : ratio_dist(gen);
         size_t pos_ratio = pos_dist(gen);
-        rand_read_info(&pos, &len, fsize, pos_ratio, size_ratio,
-                       buffered_ ? record_size_ : blk_size);
+        rand_read_info(&pos, &len, fsize, pos_ratio, size_ratio, align_size);
+      } else {
+        len = size_bounds_.min_size == size_bounds_.max_size
+                  ? size_bounds_.min_size
+                  : size_dist(gen);
+        if (len >= fsize) {
+          len = fsize;
+          pos = 0;
+        } else {
+          pos = align_floor(get_round(pos_dist(gen), 0, fsize - len - 1),
+                            align_size);
+        }
       }
 
       if (running) {
@@ -249,10 +234,25 @@ void FileScan::do_read() {
 
       if (full_middle_) {
         size_t fidx = rand_indexes[0];
-        double size_ratio =
-            min_ratio_ == max_ratio_ ? min_ratio_ : ratio_dist(gen);
-        rand_read_info(&pos, &len, file_sizes_[fidx], 0.0, size_ratio,
-                       buffered_ ? record_size_ : blk_size);
+        if (size_bounds_.is_ratio) {
+          size_t size_ratio = size_bounds_.min_ratio == size_bounds_.max_ratio
+                                  ? size_bounds_.min_ratio
+                                  : ratio_dist(gen);
+          rand_read_info(&pos, &len, file_sizes_[fidx], 0.0, size_ratio,
+                         align_size);
+        } else {
+          len = size_bounds_.min_size == size_bounds_.max_size
+                    ? size_bounds_.min_size
+                    : size_dist(gen);
+          size_t fsize = file_sizes_[fidx];
+          if (len >= fsize) {
+            len = fsize;
+            pos = 0;
+          } else {
+            pos = align_floor(get_round(pos_dist(gen), 0, fsize - len - 1),
+                              align_size);
+          }
+        }
         positions.insert({fidx, file_sizes_[fidx] - len});
         lengths.insert({fidx, len});
 
@@ -264,21 +264,44 @@ void FileScan::do_read() {
           }
 
           fidx = rand_indexes[rand_num_files - 1];
-          size_ratio = min_ratio_ == max_ratio_ ? min_ratio_ : ratio_dist(gen);
-          rand_read_info(&pos, &len, file_sizes_[fidx], 0.0, size_ratio,
-                         buffered_ ? record_size_ : blk_size);
+          if (size_bounds_.is_ratio) {
+            size_t size_ratio = size_bounds_.min_ratio == size_bounds_.max_ratio
+                                    ? size_bounds_.min_ratio
+                                    : ratio_dist(gen);
+            rand_read_info(&pos, &len, file_sizes_[fidx], 0.0, size_ratio,
+                           align_size);
+          } else {
+            len = std::min(file_sizes_[fidx],
+                           size_bounds_.min_size == size_bounds_.max_size
+                               ? size_bounds_.min_size
+                               : size_dist(gen));
+          }
           positions.insert({fidx, 0});
           lengths.insert({fidx, len});
         }
       } else {
         for (size_t i = 0; i < rand_num_files; i++) {
           size_t fidx = rand_indexes[i];
-          double size_ratio =
-              min_ratio_ == max_ratio_ ? min_ratio_ : ratio_dist(gen);
-          double pos_ratio = pos_dist(gen);
 
-          rand_read_info(&pos, &len, file_sizes_[fidx], pos_ratio, size_ratio,
-                         buffered_ ? record_size_ : blk_size);
+          if (size_bounds_.is_ratio) {
+            size_t size_ratio = size_bounds_.min_ratio == size_bounds_.max_ratio
+                                    ? size_bounds_.min_ratio
+                                    : ratio_dist(gen);
+            rand_read_info(&pos, &len, file_sizes_[fidx], pos_dist(gen),
+                           size_ratio, align_size);
+          } else {
+            len = size_bounds_.min_size == size_bounds_.max_size
+                      ? size_bounds_.min_size
+                      : size_dist(gen);
+            size_t fsize = file_sizes_[fidx];
+            if (len >= fsize) {
+              len = fsize;
+              pos = 0;
+            } else {
+              pos = align_floor(get_round(pos_dist(gen), 0, fsize - len - 1),
+                                align_size);
+            }
+          }
 
           positions.insert({fidx, pos});
           lengths.insert({fidx, len});
@@ -418,13 +441,19 @@ void FileScan::update_stats(long long time, size_t ops, size_t bytes,
 }
 
 void FileScan::print_arguments() {
+  print_argument("page-size", get_page_size());
+  print_argument("block-size", get_block_size());
   print_argument("dir", dir_);
   print_argument("record-size", record_size_);
   print_argument("max-time", std::to_string(max_time_));
   print_argument("buffered", buffered_);
   print_argument("threads", std::to_string(num_threads_));
   print_argument("file-ratio", min_files_, max_files_);
-  print_argument("size-ratio", min_ratio_, max_ratio_);
+  if (size_bounds_.is_ratio)
+    print_argument("size-ratio", size_bounds_.min_ratio,
+                   size_bounds_.max_ratio);
+  else
+    print_argument("size-ratio", size_bounds_.min_size, size_bounds_.max_size);
   print_argument("seq-file", seq_file_);
   print_argument("seq-scan", seq_scan_);
   print_argument("full-middle", full_middle_);

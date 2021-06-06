@@ -10,24 +10,18 @@
 int main(int argc, char *argv[]) {
   if (argc != 5) {
     std::cout << "Usage: " << argv[0] << " [key=value]..." << std::endl;
-    std::cout << "       Keys:" << std::endl;
-    std::cout << "         -        dir: Path to the output directory."
+    std::cout << "  Keys:" << std::endl;
+    std::cout << "    -        dir: Path to the output directory." << std::endl;
+    std::cout << "    - total-size: Total data size to write." << std::endl;
+    std::cout << "                  e.g. 12, 34b, 2kB, 3MB, 4GB" << std::endl;
+    std::cout << "    -  file-size: Maximum file size." << std::endl;
+    std::cout << "                  e.g. 12, 34b, 2kB, 3MB, 4GB" << std::endl;
+    std::cout << "                  if 0 or file-size >= total-size, write to "
+                 "a single file."
               << std::endl;
-    std::cout << "         - total-size: Total data size to write."
+    std::cout << "    - sequential: Write files sequentially." << std::endl;
+    std::cout << "                  {true, t, yes, y, 1, false, f, no, n, 0}"
               << std::endl;
-    std::cout << "                       e.g. 12, 34b, 2kB, 3MB, 4GB"
-              << std::endl;
-    std::cout << "         -  file-size: Maximum file size." << std::endl;
-    std::cout << "                       e.g. 12, 34b, 2kB, 3MB, 4GB"
-              << std::endl;
-    std::cout << "                       if 0 or file-size >= total-size, "
-                 "write to a single file."
-              << std::endl;
-    std::cout << "         - sequential: Write files sequentially."
-              << std::endl;
-    std::cout
-        << "                       {true, t, yes, y, 1, false, f, no, n, 0}"
-        << std::endl;
     return 0;
   }
 
@@ -91,7 +85,8 @@ int main(int argc, char *argv[]) {
   std::cout << std::endl;
   std::cout << "total time: " << total_time << " ns" << std::endl;
   std::cout << "total size: " << total_written << " bytes" << std::endl;
-  std::cout << "throughput: " << tps::to_bytes_per_sec(total_written, total_time)
-            << " bytes/sec" << std::endl;
+  std::cout << "throughput: "
+            << tps::to_bytes_per_sec(total_written, total_time) << " bytes/sec"
+            << std::endl;
   return 0;
 }

@@ -90,6 +90,8 @@ void FileLookup::update_stats(long long time, size_t ops, size_t bytes) {
 }
 
 void FileLookup::print_arguments() {
+  print_argument("page-size", get_page_size());
+  print_argument("block-size", get_block_size());
   print_argument("dir", dir_);
   print_argument("record-size", record_size_);
   print_argument("max-time", std::to_string(max_time_));

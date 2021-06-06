@@ -95,6 +95,8 @@ std::unordered_map<std::string, long long> FileWrite::write() {
 }
 
 void FileWrite::print_arguments() {
+  std::cout << "# page-size = " << get_page_size() << std::endl;
+  std::cout << "# block-size = " << get_block_size() << std::endl;
   std::cout << "# dir = " << dir_ << std::endl;
   std::cout << "# total-size = " << total_ << std::endl;
   std::cout << "# file-size = " << size_ << std::endl;
